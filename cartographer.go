@@ -6,7 +6,7 @@ import (
   "reflect"
 )
 
-type Scannable interface {
+type ScannableRows interface {
   Next() bool
   Columns() ([]string, error)
   Scan(...interface{}) error
@@ -143,10 +143,12 @@ func (self *Cartographer) Register(object interface{}) error {
   return nil
 }
 
-// Map takes any type that implements the Rows interface, returning an
-// array of pointers to the object struct passed with it's members populated
-// based on the names of the columns associated with the rows.
-func (self *Cartographer) Map(rows Scannable, object interface{}) (results []interface{}, err error) {
+// Map takes any type that implements the ScannableRows interface,
+// calling methods Columns, Next,and Scan on each one, returning
+// an array of pointers to the object struct passed with it's
+// members populated based on the names of the columns associated
+// with the rows.
+func (self *Cartographer) Map(rows ScannableRows, object interface{}) (results []interface{}, err error) {
   objectType, err := discoverType(object)
 
   if nil != err {
