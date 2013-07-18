@@ -30,7 +30,6 @@ type User struct {
 func main() {
   // Assuming you have a connection to your database and stored it in a variable named `database`...
   rows, err := database.Query(`SELECT "first_name", "last_name", "email" FROM "users"`)
-  mapper := cartographer.New()
 
   if nil != err {
     // Handle potential error.

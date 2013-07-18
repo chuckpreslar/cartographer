@@ -6,80 +6,18 @@ import (
   "reflect"
 )
 
-type Rows interface {
+type Scannable interface {
   Next() bool
   Columns() ([]string, error)
   Scan(...interface{}) error
 }
 
-type Waypoint map[reflect.Type]map[string]string
-type WaypointCache map[reflect.Type]bool
-
-type Cartographer struct {
-  fieldsToColumns Waypoint
-  columnsToFields Waypoint
-  typeCache       WaypointCache
+var (
+  fieldsToColumns = make(map[reflect.Type]map[string]string)
+  columnsToFields = make(map[reflect.Type]map[string]string)
+  typeCache       = make(map[reflect.Type]bool)
   structTag       string
-}
-
-// ColumnsFor returns an array of strings of the types columns if it has been cached.
-// If it has not, it attemps to precache the object for later usage, returning
-// its column's in an array of strings after the caching is completed.
-func (self *Cartographer) ColumnsFor(object interface{}) (columns []string, err error) {
-  typ, err := discoverType(object)
-
-  if nil != err {
-    return
-  }
-
-  if _, cached := self.typeCache[typ]; !cached {
-    self.cacheType(typ)
-  }
-
-  for key, _ := range self.columnsToFields[typ] {
-    columns = append(columns, key)
-  }
-
-  return
-}
-
-// FieldsFor returns an array of strings of the type's fields if it has been cached.
-// If it has not, it attemps to precache the object for later usage, returning
-// its field's in an array of strings after the caching is completed.
-func (self *Cartographer) FieldsFor(object interface{}) (fields []string, err error) {
-  typ, err := discoverType(object)
-
-  if nil != err {
-    return
-  }
-
-  if _, cached := self.typeCache[typ]; !cached {
-    self.cacheType(typ)
-  }
-
-  for key, _ := range self.fieldsToColumns[typ] {
-    fields = append(fields, key)
-  }
-
-  return
-}
-
-// SetStructTag sets the struct tag string that maps struct fields
-// to their database column's.
-func (self *Cartographer) SetStructTag(tag string) *Cartographer {
-  self.structTag = tag
-  return self
-}
-
-// GetStructTag returns the struct tag string that maps struct fields
-// to their database column's.
-func (self *Cartographer) GetStructTag() string {
-  if 0 == len(self.structTag) {
-    return "db"
-  }
-
-  return self.structTag
-}
+)
 
 // discoverType returns the type of an object, the type
 // of the object pointed to, or an error if the type's kind is not a struct.
@@ -100,10 +38,10 @@ func discoverType(object interface{}) (typ reflect.Type, err error) {
 // cacheType adds an entry to the Cartographer's cache,
 // as well as stores the types field's and column's for later
 // usage.
-func (self *Cartographer) cacheType(typ reflect.Type) {
-  self.fieldsToColumns[typ] = make(map[string]string)
-  self.columnsToFields[typ] = make(map[string]string)
-  self.typeCache[typ] = true
+func cacheType(typ reflect.Type) {
+  fieldsToColumns[typ] = make(map[string]string)
+  columnsToFields[typ] = make(map[string]string)
+  typeCache[typ] = true
 
   var numberOfFields = typ.NumField()
 
@@ -111,21 +49,104 @@ func (self *Cartographer) cacheType(typ reflect.Type) {
     var (
       field       = typ.Field(i)
       fieldName   = field.Name
-      fieldColumn = field.Tag.Get(self.GetStructTag())
+      fieldColumn = field.Tag.Get(GetStructTag())
     )
 
     if 0 != len(fieldColumn) {
-      self.columnsToFields[typ][fieldColumn] = fieldName
-      self.fieldsToColumns[typ][fieldName] = fieldColumn
+      columnsToFields[typ][fieldColumn] = fieldName
+      fieldsToColumns[typ][fieldName] = fieldColumn
     }
 
   }
 }
 
+// ColumnsFor returns an array of strings of the types columns if it has been cached.
+// If it has not, it attemps to precache the object for later usage, returning
+// its column's in an array of strings after the caching is completed.
+func ColumnsFor(object interface{}) (columns []string, err error) {
+  typ, err := discoverType(object)
+
+  if nil != err {
+    return
+  }
+
+  if _, cached := typeCache[typ]; !cached {
+    cacheType(typ)
+  }
+
+  for key, _ := range columnsToFields[typ] {
+    columns = append(columns, key)
+  }
+
+  return
+}
+
+// FieldsFor returns an array of strings of the type's fields if it has been cached.
+// If it has not, it attemps to precache the object for later usage, returning
+// its field's in an array of strings after the caching is completed.
+func FieldsFor(object interface{}) (fields []string, err error) {
+  typ, err := discoverType(object)
+
+  if nil != err {
+    return
+  }
+
+  if _, cached := typeCache[typ]; !cached {
+    cacheType(typ)
+  }
+
+  for key, _ := range fieldsToColumns[typ] {
+    fields = append(fields, key)
+  }
+
+  return
+}
+
+// SetStructTag sets the struct tag string that maps struct fields
+// to their database column's.
+func SetStructTag(tag string) {
+  structTag = tag
+}
+
+// GetStructTag returns the struct tag string that maps struct fields
+// to their database column's.
+func GetStructTag() string {
+  if 0 == len(structTag) {
+    return "db"
+  }
+
+  return structTag
+}
+
+// GetCachedTypes returns an array of type reflect.Type of types
+// that have been cached.
+func GetCachedTypes() (cache []reflect.Type) {
+  for key, _ := range typeCache {
+    cache = append(cache, key)
+  }
+
+  return
+}
+
+// Regeister is an attempt to pre-cache an object's columns
+// and fields, returning an error if the type passed is not a
+// struct kind.
+func Register(object interface{}) error {
+  typ, err := discoverType(object)
+
+  if nil != err {
+    return err
+  }
+
+  cacheType(typ)
+
+  return nil
+}
+
 // Map takes any type that implements the Rows interface, returning an
 // array of pointers to the object struct passed with it's members populated
 // based on the names of the columns associated with the rows.
-func (self *Cartographer) Map(rows Rows, object interface{}) (results []interface{}, err error) {
+func Map(rows Scannable, object interface{}) (results []interface{}, err error) {
   objectType, err := discoverType(object)
 
   if nil != err {
@@ -139,8 +160,8 @@ func (self *Cartographer) Map(rows Rows, object interface{}) (results []interfac
     return nil, err
   }
 
-  if _, cached := self.typeCache[objectType]; !cached {
-    self.cacheType(objectType)
+  if _, cached := typeCache[objectType]; !cached {
+    cacheType(objectType)
   }
 
   for rows.Next() {
@@ -166,9 +187,9 @@ func (self *Cartographer) Map(rows Rows, object interface{}) (results []interfac
     // Loop over each of the scanned row elements.
     for index, _ := range rowElements {
       var (
-        value  = (*rowElements[index].(*interface{}))                                // The dereferenced value at the current index.
-        column = columns[index]                                                      // Current column.
-        field  = objectElement.FieldByName(self.columnsToFields[objectType][column]) // The field the value belongs to.
+        value  = (*rowElements[index].(*interface{}))                           // The dereferenced value at the current index.
+        column = columns[index]                                                 // Current column.
+        field  = objectElement.FieldByName(columnsToFields[objectType][column]) // The field the value belongs to.
       )
 
       // FIXME: This is just a basic switch for demonstration, needs to be completed.
@@ -186,16 +207,6 @@ func (self *Cartographer) Map(rows Rows, object interface{}) (results []interfac
     results = append(results, objectReplica.Interface())
 
   }
-
-  return
-}
-
-// New creates and returns a pointer to a new Cartographer instance.
-func New() (cartographer *Cartographer) {
-  cartographer = new(Cartographer)
-  cartographer.typeCache = make(WaypointCache)
-  cartographer.fieldsToColumns = make(Waypoint)
-  cartographer.columnsToFields = make(Waypoint)
 
   return
 }
