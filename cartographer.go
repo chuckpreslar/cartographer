@@ -128,9 +128,10 @@ func (self *Cartographer) GetCachedTypes() (cache []reflect.Type) {
   return
 }
 
-// Regeister is an attempt to pre-cache an object's columns
-// and fields, returning an error if the type passed is not a
-// struct kind.
+// Regeister is an attempt to pre-cache an `object`'s
+// field names and their `db` tags intended to be a map
+// to corresponding database columns, returning an error
+// if the type passed is not a struct kind.
 func (self *Cartographer) Register(object interface{}) error {
   typ, err := discoverType(object)
 
@@ -144,10 +145,13 @@ func (self *Cartographer) Register(object interface{}) error {
 }
 
 // Map takes any type that implements the ScannableRows interface,
-// calling methods Columns, Next,and Scan on each one, returning
-// an array of pointers to the object struct passed with it's
+// calling methods Columns, Next, and Scan. Map's parameter `object`
+// must have a reflect.Kind of struct. Map attempts to read and
+// cache tags on struct fields labled `db`, which is intended to
+// be a map to the field's corresponding database column.
+// An array of pointers to the `object` struct passed with it's
 // members populated based on the names of the columns associated
-// with the rows.
+// with the rows is returned.
 func (self *Cartographer) Map(rows ScannableRows, object interface{}) (results []interface{}, err error) {
   objectType, err := discoverType(object)
 
@@ -213,6 +217,7 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}) (results [
   return
 }
 
+// New returns a pointer to a new Cartographer type.
 func New() (cartographer *Cartographer) {
   cartographer = new(Cartographer)
   cartographer.fieldsToColumns = make(map[reflect.Type]map[string]string)
