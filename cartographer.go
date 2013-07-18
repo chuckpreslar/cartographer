@@ -12,12 +12,12 @@ type Scannable interface {
   Scan(...interface{}) error
 }
 
-var (
-  fieldsToColumns = make(map[reflect.Type]map[string]string)
-  columnsToFields = make(map[reflect.Type]map[string]string)
-  typeCache       = make(map[reflect.Type]bool)
-  structTag       string
-)
+type Cartographer struct {
+  fieldsToColumns map[reflect.Type]map[string]string // Map from an reflect.Type's fields to database columns.
+  columnsToFields map[reflect.Type]map[string]string // Map from an reflect.Type's database columns to fields.
+  typeCache       map[reflect.Type]bool              // Is the reflect.Type cached?
+  structTag       string                             // Struct field tag for field to column mapping.
+}
 
 // discoverType returns the type of an object, the type
 // of the object pointed to, or an error if the type's kind is not a struct.
@@ -38,10 +38,10 @@ func discoverType(object interface{}) (typ reflect.Type, err error) {
 // cacheType adds an entry to the Cartographer's cache,
 // as well as stores the types field's and column's for later
 // usage.
-func cacheType(typ reflect.Type) {
-  fieldsToColumns[typ] = make(map[string]string)
-  columnsToFields[typ] = make(map[string]string)
-  typeCache[typ] = true
+func (self *Cartographer) cacheType(typ reflect.Type) {
+  self.fieldsToColumns[typ] = make(map[string]string)
+  self.columnsToFields[typ] = make(map[string]string)
+  self.typeCache[typ] = true
 
   var numberOfFields = typ.NumField()
 
@@ -49,12 +49,12 @@ func cacheType(typ reflect.Type) {
     var (
       field       = typ.Field(i)
       fieldName   = field.Name
-      fieldColumn = field.Tag.Get(GetStructTag())
+      fieldColumn = field.Tag.Get(self.GetStructTag())
     )
 
     if 0 != len(fieldColumn) {
-      columnsToFields[typ][fieldColumn] = fieldName
-      fieldsToColumns[typ][fieldName] = fieldColumn
+      self.columnsToFields[typ][fieldColumn] = fieldName
+      self.fieldsToColumns[typ][fieldName] = fieldColumn
     }
 
   }
@@ -63,18 +63,18 @@ func cacheType(typ reflect.Type) {
 // ColumnsFor returns an array of strings of the types columns if it has been cached.
 // If it has not, it attemps to precache the object for later usage, returning
 // its column's in an array of strings after the caching is completed.
-func ColumnsFor(object interface{}) (columns []string, err error) {
+func (self *Cartographer) ColumnsFor(object interface{}) (columns []string, err error) {
   typ, err := discoverType(object)
 
   if nil != err {
     return
   }
 
-  if _, cached := typeCache[typ]; !cached {
-    cacheType(typ)
+  if _, cached := self.typeCache[typ]; !cached {
+    self.cacheType(typ)
   }
 
-  for key, _ := range columnsToFields[typ] {
+  for key, _ := range self.columnsToFields[typ] {
     columns = append(columns, key)
   }
 
@@ -84,18 +84,18 @@ func ColumnsFor(object interface{}) (columns []string, err error) {
 // FieldsFor returns an array of strings of the type's fields if it has been cached.
 // If it has not, it attemps to precache the object for later usage, returning
 // its field's in an array of strings after the caching is completed.
-func FieldsFor(object interface{}) (fields []string, err error) {
+func (self *Cartographer) FieldsFor(object interface{}) (fields []string, err error) {
   typ, err := discoverType(object)
 
   if nil != err {
     return
   }
 
-  if _, cached := typeCache[typ]; !cached {
-    cacheType(typ)
+  if _, cached := self.typeCache[typ]; !cached {
+    self.cacheType(typ)
   }
 
-  for key, _ := range fieldsToColumns[typ] {
+  for key, _ := range self.fieldsToColumns[typ] {
     fields = append(fields, key)
   }
 
@@ -104,24 +104,24 @@ func FieldsFor(object interface{}) (fields []string, err error) {
 
 // SetStructTag sets the struct tag string that maps struct fields
 // to their database column's.
-func SetStructTag(tag string) {
-  structTag = tag
+func (self *Cartographer) SetStructTag(tag string) {
+  self.structTag = tag
 }
 
 // GetStructTag returns the struct tag string that maps struct fields
 // to their database column's.
-func GetStructTag() string {
-  if 0 == len(structTag) {
+func (self *Cartographer) GetStructTag() string {
+  if 0 == len(self.structTag) {
     return "db"
   }
 
-  return structTag
+  return self.structTag
 }
 
 // GetCachedTypes returns an array of type reflect.Type of types
 // that have been cached.
-func GetCachedTypes() (cache []reflect.Type) {
-  for key, _ := range typeCache {
+func (self *Cartographer) GetCachedTypes() (cache []reflect.Type) {
+  for key, _ := range self.typeCache {
     cache = append(cache, key)
   }
 
@@ -131,14 +131,14 @@ func GetCachedTypes() (cache []reflect.Type) {
 // Regeister is an attempt to pre-cache an object's columns
 // and fields, returning an error if the type passed is not a
 // struct kind.
-func Register(object interface{}) error {
+func (self *Cartographer) Register(object interface{}) error {
   typ, err := discoverType(object)
 
   if nil != err {
     return err
   }
 
-  cacheType(typ)
+  self.cacheType(typ)
 
   return nil
 }
@@ -146,7 +146,7 @@ func Register(object interface{}) error {
 // Map takes any type that implements the Rows interface, returning an
 // array of pointers to the object struct passed with it's members populated
 // based on the names of the columns associated with the rows.
-func Map(rows Scannable, object interface{}) (results []interface{}, err error) {
+func (self *Cartographer) Map(rows Scannable, object interface{}) (results []interface{}, err error) {
   objectType, err := discoverType(object)
 
   if nil != err {
@@ -160,8 +160,8 @@ func Map(rows Scannable, object interface{}) (results []interface{}, err error) 
     return nil, err
   }
 
-  if _, cached := typeCache[objectType]; !cached {
-    cacheType(objectType)
+  if _, cached := self.typeCache[objectType]; !cached {
+    self.cacheType(objectType)
   }
 
   for rows.Next() {
@@ -187,9 +187,9 @@ func Map(rows Scannable, object interface{}) (results []interface{}, err error) 
     // Loop over each of the scanned row elements.
     for index, _ := range rowElements {
       var (
-        value  = (*rowElements[index].(*interface{}))                           // The dereferenced value at the current index.
-        column = columns[index]                                                 // Current column.
-        field  = objectElement.FieldByName(columnsToFields[objectType][column]) // The field the value belongs to.
+        value  = (*rowElements[index].(*interface{}))                                // The dereferenced value at the current index.
+        column = columns[index]                                                      // Current column.
+        field  = objectElement.FieldByName(self.columnsToFields[objectType][column]) // The field the value belongs to.
       )
 
       // FIXME: This is just a basic switch for demonstration, needs to be completed.
@@ -207,6 +207,15 @@ func Map(rows Scannable, object interface{}) (results []interface{}, err error) 
     results = append(results, objectReplica.Interface())
 
   }
+
+  return
+}
+
+func New() (cartographer *Cartographer) {
+  cartographer = new(Cartographer)
+  cartographer.fieldsToColumns = make(map[reflect.Type]map[string]string)
+  cartographer.columnsToFields = make(map[reflect.Type]map[string]string)
+  cartographer.typeCache = make(map[reflect.Type]bool)
 
   return
 }

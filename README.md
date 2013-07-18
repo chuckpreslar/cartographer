@@ -29,11 +29,14 @@ func main() {
   // Assuming you have a connection to your database and stored it in a variable named `database`...
   rows, err := database.Query(`SELECT "first_name", "last_name", "email" FROM "users"`)
 
+
   if nil != err {
     // Handle potential error.
   }
+
+  cartographerInstance := cartographer.New()
   
-  users, err := mapper.Map(rows, User{})
+  users, err := cartographerInstance.Map(rows, User{})
   
   if nil != err {
     // Handle potential error.
