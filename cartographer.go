@@ -25,8 +25,12 @@ type Cartographer struct {
 // ColumnsFor returns an array of strings of the types columns if it has been cached.
 // If it has not, it attemps to precache the object for later usage, returning
 // its column's in an array of strings after the caching is completed.
-func (self *Cartographer) ColumnsFor(object interface{}) (columns []string) {
-  var typ = discoverType(object)
+func (self *Cartographer) ColumnsFor(object interface{}) (columns []string, err error) {
+  typ, err := discoverType(object)
+
+  if nil != err {
+    return
+  }
 
   if _, cached := self.typeCache[typ]; !cached {
     self.cacheType(typ)
@@ -42,8 +46,12 @@ func (self *Cartographer) ColumnsFor(object interface{}) (columns []string) {
 // FieldsFor returns an array of strings of the type's fields if it has been cached.
 // If it has not, it attemps to precache the object for later usage, returning
 // its field's in an array of strings after the caching is completed.
-func (self *Cartographer) FieldsFor(object interface{}) (fields []string) {
-  var typ = discoverType(object)
+func (self *Cartographer) FieldsFor(object interface{}) (fields []string, err error) {
+  typ, err := discoverType(object)
+
+  if nil != err {
+    return
+  }
 
   if _, cached := self.typeCache[typ]; !cached {
     self.cacheType(typ)
@@ -73,13 +81,17 @@ func (self *Cartographer) GetStructTag() string {
   return self.structTag
 }
 
-// discoverType returns the type of an object, or the type
-// of the object pointed to.
-func discoverType(object interface{}) (typ reflect.Type) {
+// discoverType returns the type of an object, the type
+// of the object pointed to, or an error if the type's kind is not a struct.
+func discoverType(object interface{}) (typ reflect.Type, err error) {
   typ = reflect.TypeOf(object)
 
   if reflect.Ptr == typ.Kind() {
     typ = typ.Elem()
+  }
+
+  if reflect.Struct != typ.Kind() {
+    return nil, errors.New(fmt.Sprintf("Map expected a struct to be passed in to be replicated and populated, received %T.", object))
   }
 
   return
@@ -113,23 +125,19 @@ func (self *Cartographer) cacheType(typ reflect.Type) {
 // Map takes any type that implements the Rows interface, returning an
 // array of pointers to the object struct passed with it's members populated
 // based on the names of the columns associated with the rows.
-func (self *Cartographer) Map(rows Rows, object interface{}) ([]interface{}, error) {
-  if reflect.Struct != reflect.ValueOf(object).Kind() {
-    return nil, errors.New(fmt.Sprintf("Map expected a struct to be passed in to be replicated and populated, received %T.", object))
-  }
-
-  var (
-    columns, err    = rows.Columns() // Columns returned for the results returned.
-    numberOfColumns = len(columns)   // Number of columns.
-
-    results []interface{} // Results to return.
-  )
+func (self *Cartographer) Map(rows Rows, object interface{}) (results []interface{}, err error) {
+  objectType, err := discoverType(object)
 
   if nil != err {
     return nil, err
   }
 
-  var objectType = discoverType(object)
+  columns, err := rows.Columns()  // Columns returned for the results returned.
+  numberOfColumns := len(columns) // Number of columns.
+
+  if nil != err {
+    return nil, err
+  }
 
   if _, cached := self.typeCache[objectType]; !cached {
     self.cacheType(objectType)
@@ -179,7 +187,7 @@ func (self *Cartographer) Map(rows Rows, object interface{}) ([]interface{}, err
 
   }
 
-  return results, nil
+  return
 }
 
 // New creates and returns a pointer to a new Cartographer instance.
