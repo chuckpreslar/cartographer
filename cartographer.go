@@ -211,7 +211,7 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
         case reflect.String:
           field.SetString(fmt.Sprintf(`%s`, value))
         case reflect.Int:
-          field.SetInt(value.(int64))
+          field.SetInt(int64(value.(int)))
         case reflect.Bool:
           field.SetBool(value.(bool))
         }
