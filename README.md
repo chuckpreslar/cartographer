@@ -34,9 +34,9 @@ func main() {
     // Handle potential error.
   }
 
-  cartographerInstance := cartographer.New()
+  instance := cartographer.New()
   
-  users, err := cartographerInstance.Map(rows, User{})
+  users, err := instance.Map(rows, User{})
   
   if nil != err {
     // Handle potential error.
