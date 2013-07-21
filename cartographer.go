@@ -4,6 +4,7 @@ import (
   "errors"
   "fmt"
   "reflect"
+  "strconv"
 )
 
 type ScannableRows interface {
@@ -205,15 +206,18 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
         field  = objectElement.FieldByName(self.columnsToFields[objectType][column]) // The field the value belongs to.
       )
 
-      // FIXME: This is just a basic switch for demonstration, needs to be completed.
       if field.CanSet() {
         switch field.Kind() {
         case reflect.String:
-          field.SetString(fmt.Sprintf(`%s`, value))
+          field.SetString(parseString(value))
         case reflect.Int:
-          field.SetInt(int64(value.(int)))
+          field.SetInt(parseInt(value))
+        case reflect.Float32, reflect.Float64:
+          field.SetFloat(parseFloat(value))
         case reflect.Bool:
-          field.SetBool(value.(bool))
+          field.SetBool(parseBool(value))
+        case reflect.Struct:
+          field.Set(parseStruct(value))
         }
       }
     }
@@ -224,6 +228,44 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
   }
 
   return
+}
+
+func parseString(o interface{}) string {
+  return fmt.Sprintf("%s", o)
+}
+
+func parseInt(o interface{}) int64 {
+  switch o.(type) {
+  case int:
+    return int64(o.(int))
+  case int16:
+    return int64(o.(int16))
+  case int32:
+    return int64(o.(int32))
+  default:
+    return int64(o.(int64))
+  }
+}
+
+func parseFloat(o interface{}) float64 {
+  switch o.(type) {
+  case []uint8:
+    // FIXME: Should never error, but still bad pratice.
+    float, _ := strconv.ParseFloat(fmt.Sprintf("%s", o), 8)
+    return float
+  case float32:
+    return float64(o.(float32))
+  default:
+    return float64(o.(float64))
+  }
+}
+
+func parseBool(o interface{}) bool {
+  return o.(bool)
+}
+
+func parseStruct(o interface{}) reflect.Value {
+  return reflect.ValueOf(o)
 }
 
 // New returns a pointer to a new Cartographer type.
