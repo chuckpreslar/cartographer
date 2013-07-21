@@ -13,7 +13,7 @@ type ScannableRows interface {
   Scan(...interface{}) error
 }
 
-type TypeHook func(reflect.Value)
+type TypeHook func(reflect.Value) error
 
 type Cartographer struct {
   fieldsToColumns map[reflect.Type]map[string]string // Map from an reflect.Type's fields to database columns.
@@ -195,7 +195,9 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
     )
 
     for _, hook := range hooks {
-      hook(objectElement)
+      if err := hook(objectElement); nil != err {
+        return []interface{}{}, err
+      }
     }
 
     // Loop over each of the scanned row elements.
