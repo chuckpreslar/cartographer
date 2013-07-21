@@ -195,8 +195,8 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
     )
 
     for _, hook := range hooks {
-      if err := hook(objectElement); nil != err {
-        return []interface{}{}, err
+      if err = hook(objectElement); nil != err {
+        return // TypeHook returned an error, return it to caller to deal with.
       }
     }
 
