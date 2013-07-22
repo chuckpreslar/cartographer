@@ -194,12 +194,6 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
       objectElement = objectReplica.Elem()
     )
 
-    for _, hook := range hooks {
-      if err = hook(objectElement); nil != err {
-        return // TypeHook returned an error, return it to caller to deal with.
-      }
-    }
-
     // Loop over each of the scanned row elements.
     for index, _ := range rowElements {
       var (
@@ -221,6 +215,12 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
         case reflect.Struct:
           field.Set(parseStruct(value))
         }
+      }
+    }
+
+    for _, hook := range hooks {
+      if err = hook(objectElement); nil != err {
+        return // TypeHook returned an error, return it to caller to deal with.
       }
     }
 
