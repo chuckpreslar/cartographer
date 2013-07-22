@@ -190,8 +190,8 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
 
     // Reflections craziness.
     var (
-      objectReplica = reflect.New(objectType)
-      objectElement = objectReplica.Elem()
+      objectReplica = reflect.New(objectType) // Create a replica of the same type of `object` passed.
+      objectElement = objectReplica.Elem()    // The element the replica points to.
     )
 
     // Loop over each of the scanned row elements.
@@ -219,7 +219,7 @@ func (self *Cartographer) Map(rows ScannableRows, object interface{}, hooks ...T
     }
 
     for _, hook := range hooks {
-      if err = hook(objectElement); nil != err {
+      if err = hook(objectReplica); nil != err {
         return // TypeHook returned an error, return it to caller to deal with.
       }
     }
