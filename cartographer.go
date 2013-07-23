@@ -132,11 +132,11 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]int
   return
 }
 
-// ModifiedColumnsAndValuesFor is intended to accept a map of strings to interfaces
-// as a snap shot of the object at an early time/previous state, returning
-// an array of columns that have been modified, values of the columns modified
-// with corresponding indices, or an error if one occurs.
-func (self *Cartographer) ModifiedColumnsAndValuesFor(i map[string]interface{}, o interface{}) (columns []string, values []interface{}, err error) {
+// ModifiedColumnsValuesMapFor accepts a map of strings to interfaces
+// intedned to be a snap shot of the object `o` at an early time/previous state,
+// returning a map of the column name for the modified field to its value,
+// or an error if one occurs.
+func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, o interface{}) (values map[string]interface{}, err error) {
   typ, err := self.DiscoverType(o)
   n, _ := self.FieldValueMapFor(o)
 
@@ -144,10 +144,11 @@ func (self *Cartographer) ModifiedColumnsAndValuesFor(i map[string]interface{}, 
     return
   }
 
+  values = make(map[string]interface{})
+
   for key, value := range n {
     if n[key] != i[key] {
-      columns = append(columns, self.fieldsToColumns[typ][key])
-      values = append(values, value)
+      values[self.fieldsToColumns[typ][key]] = value
     }
   }
 
