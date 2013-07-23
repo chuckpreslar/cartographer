@@ -5,7 +5,7 @@ import (
   "testing"
 )
 
-var instance = New()
+var instance = New("db")
 
 type scanner struct {
   scanned bool
@@ -53,7 +53,7 @@ func TestColumnsFor(t *testing.T) {
   columns, err := instance.ColumnsFor(faker{})
 
   if nil != err {
-    t.Errorf("Basic ColumnsFor test returned an unexpected error: %v", err) 
+    t.Errorf("Basic ColumnsFor test returned an unexpected error: %v", err)
   }
 
   if 1 != len(columns) || "id" != columns[0] {
@@ -65,10 +65,22 @@ func TestFieldsFor(t *testing.T) {
   fields, err := instance.FieldsFor(faker{})
 
   if nil != err {
-    t.Errorf("Basic FieldsFor test returned an unexpected error: %v", err) 
+    t.Errorf("Basic FieldsFor test returned an unexpected error: %v", err)
   }
 
   if 1 != len(fields) || "Id" != fields[0] {
     t.Errorf("Basic FieldsFor test returned unexpected fields: %v", fields)
+  }
+}
+
+func TestFieldValueMapFor(t *testing.T) {
+  values, err := instance.FieldValueMapFor(faker{1})
+
+  if nil != err {
+    t.Errorf("Basic FieldValueMapFor test returned an unexpected error: %v", err)
+  }
+
+  if 1 != values["Id"] {
+    t.Errorf("Basic FieldValueMapFor test returned unexpected map: %v", values)
   }
 }
