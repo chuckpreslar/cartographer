@@ -132,6 +132,28 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]int
   return
 }
 
+// ModifiedColumnsAndValuesFor is intended to accept a map of strings to interfaces
+// as a snap shot of the object at an early time/previous state, returning
+// an array of columns that have been modified, values of the columns modified
+// with corresponding indices, or an error if one occurs.
+func (self *Cartographer) ModifiedColumnsAndValuesFor(i map[string]interface{}, o interface{}) (columns []string, values []interface{}, err error) {
+  typ, err := self.DiscoverType(o)
+  n, _ := self.FieldValueMapFor(o)
+
+  if nil != err {
+    return
+  }
+
+  for key, value := range n {
+    if n[key] != i[key] {
+      columns = append(columns, self.fieldsToColumns[typ][key])
+      values = append(values, value)
+    }
+  }
+
+  return
+}
+
 // Map takes any type that implements the ScannableRows interface,
 // calling methods Columns, Next, and Scan. Map's parameter `o`
 // must have a reflect.Kind of struct. Map attempts to read and
