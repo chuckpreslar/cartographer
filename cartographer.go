@@ -155,6 +155,58 @@ func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, 
   return
 }
 
+// Sync is a helper method that is inteded to be used typically after
+// an insert statement has been executed and the tables primary key
+// that's potentially auto incremented returned.
+func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook) (result interface{}, err error) {
+  results, err := self.Map(rows, o, hooks...)
+
+  if nil != err {
+    return
+  }
+
+  if 1 != len(results) {
+    err = errors.New("Sync expected one and only one result to be returned from Map.")
+    return
+  }
+
+  result = results[0]
+
+  original, err := self.FieldValueMapFor(o)
+
+  if nil != err {
+    return
+  }
+
+  synced, err := self.FieldValueMapFor(result)
+
+  if nil != err {
+    return
+  }
+
+  element := reflect.ValueOf(o)
+
+  if reflect.Ptr == element.Kind() {
+    element = element.Elem()
+  }
+
+  for key, value := range synced {
+    zero := reflect.Zero(reflect.TypeOf(value)).Interface()
+    if original[key] != synced[key] && value != zero {
+      field := element.FieldByName(key)
+
+      if field.CanSet() {
+        field.Set(reflect.ValueOf(value))
+      } else {
+        err = errors.New(fmt.Sprintf("Sync failed to set field %s.", key))
+        return
+      }
+    }
+  }
+
+  return o, nil
+}
+
 // Map takes any type that implements the ScannableRows interface,
 // calling methods Columns, Next, and Scan. Map's parameter `o`
 // must have a reflect.Kind of struct. Map attempts to read and
