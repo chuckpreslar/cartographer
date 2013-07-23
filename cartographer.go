@@ -24,7 +24,7 @@ type Cartographer struct {
 
 // DiscoverType the reflect.Type of the `o` parameter passed, caching
 // its fields and database columns taken from the fields `db` tag, or an
-// error if the reflect.Types kind is not a struct.
+// error if the reflect.Type's kind is not a struct.
 func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err error) {
   typ = reflect.TypeOf(o)
 
@@ -33,8 +33,8 @@ func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err err
   }
 
   if reflect.Struct != typ.Kind() {
-    err = errors.New(fmt.Sprintf("CreateReplica expected a struct "+
-      " to be passed in to be replicated and populated, received %T.", o))
+    err = errors.New(fmt.Sprintf("Expected a struct "+
+      " to be passed, received %T.", o))
     return
   }
 
@@ -64,7 +64,7 @@ func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err err
 }
 
 // CreateReplica uses the reflect package to create a replica of the interface passed,
-// returning a reflect.Value or error.
+// returning a reflect.Value, or an error if `o` is not a struct.
 func (self *Cartographer) CreateReplica(o interface{}) (replica reflect.Value, err error) {
   typ, err := self.DiscoverType(o)
 
@@ -76,7 +76,8 @@ func (self *Cartographer) CreateReplica(o interface{}) (replica reflect.Value, e
   return
 }
 
-// ColumnsFor returns an array of strings of the types columns or an error.
+// ColumnsFor returns an array of strings of the types columns, or an
+// error if `o` is not a struct.
 func (self *Cartographer) ColumnsFor(o interface{}) (columns []string, err error) {
   typ, err := self.DiscoverType(o)
 
@@ -91,7 +92,8 @@ func (self *Cartographer) ColumnsFor(o interface{}) (columns []string, err error
   return
 }
 
-// FieldsFor returns an array of strings of the types fields or an error.
+// FieldsFor returns an array of strings of the types fields, or an
+// error if `o` is not a struct.
 func (self *Cartographer) FieldsFor(o interface{}) (fields []string, err error) {
   typ, err := self.DiscoverType(o)
 
@@ -121,12 +123,6 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]int
 
   if reflect.Ptr == item.Kind() {
     item = item.Elem()
-  }
-
-  if reflect.Struct != item.Kind() {
-    err = errors.New(fmt.Sprintf("FieldValueMapFor expected a struct "+
-      " to be passed for mapping, received %T.", o))
-    return
   }
 
   for key, _ := range self.fieldsToColumns[typ] {
