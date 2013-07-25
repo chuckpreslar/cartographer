@@ -157,8 +157,16 @@ func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, 
 
 // Sync is a helper method that is inteded to be used typically after
 // an insert statement has been executed and the tables primary key
-// that's potentially auto incremented returned.
-func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook) (result interface{}, err error) {
+// that's potentially auto incremented returned, returning the synced
+// objected or an error.
+func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook) (err error) {
+  element := reflect.ValueOf(o)
+
+  if reflect.Ptr != element.Kind() {
+    err = errors.New("Sync expected a pointer to be passed for manipulation.")
+    return
+  }
+
   results, err := self.Map(rows, o, hooks...)
 
   if nil != err {
@@ -166,11 +174,11 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
   }
 
   if 1 != len(results) {
-    err = errors.New("Sync expected one and only one result to be returned from Map.")
+    err = errors.New("Sync expected one and only one result to be returned.")
     return
   }
 
-  result = results[0]
+  result := results[0]
 
   original, err := self.FieldValueMapFor(o)
 
@@ -183,8 +191,6 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
   if nil != err {
     return
   }
-
-  element := reflect.ValueOf(o)
 
   if reflect.Ptr == element.Kind() {
     element = element.Elem()
@@ -204,7 +210,7 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
     }
   }
 
-  return o, nil
+  return
 }
 
 // Map takes any type that implements the ScannableRows interface,
@@ -256,6 +262,7 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
       )
 
       if field.CanSet() {
+        // FIXME: Look into just calling Set with ValueOf value.
         switch field.Kind() {
         case reflect.String:
           field.SetString(parseString(value))
