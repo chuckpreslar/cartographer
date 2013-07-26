@@ -160,52 +160,66 @@ func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, 
 // that's potentially auto incremented returned, returning the synced
 // objected or an error.
 func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook) (err error) {
-  element := reflect.ValueOf(o)
+  typ, err := self.DiscoverType(o)
 
-  if reflect.Ptr != element.Kind() {
+  if nil != err {
+    return
+  }
+
+  object := reflect.ValueOf(o)
+
+  if reflect.Ptr != object.Kind() {
     err = errors.New("Sync expected a pointer to be passed for manipulation.")
     return
   }
 
-  results, err := self.Map(rows, o, hooks...)
+  element := object.Elem()
+  columns, err := rows.Columns()
 
   if nil != err {
     return
   }
 
-  if 1 != len(results) {
-    err = errors.New("Sync expected one and only one result to be returned.")
-    return
-  }
+  numberOfColumns := len(columns)
 
-  result := results[0]
+  for rows.Next() {
+    buffer := generateBuffer(numberOfColumns)
+    err = rows.Scan(buffer...)
 
-  original, err := self.FieldValueMapFor(o)
+    if nil != err {
+      return
+    }
 
-  if nil != err {
-    return
-  }
-
-  synced, err := self.FieldValueMapFor(result)
-
-  if nil != err {
-    return
-  }
-
-  if reflect.Ptr == element.Kind() {
-    element = element.Elem()
-  }
-
-  for key, value := range synced {
-    zero := reflect.Zero(reflect.TypeOf(value)).Interface()
-    if original[key] != synced[key] && value != zero {
-      field := element.FieldByName(key)
+    // FIXME: Move this chunk of duplicated code into it's on helper method.
+    for index, _ := range buffer {
+      var (
+        value  = (*buffer[index].(*interface{}))                        // The dereferenced value at the current index.
+        column = columns[index]                                         // Current column.
+        field  = element.FieldByName(self.columnsToFields[typ][column]) // The field the value belongs to.
+      )
 
       if field.CanSet() {
-        field.Set(reflect.ValueOf(value))
+        switch field.Kind() {
+        case reflect.String:
+          field.SetString(parseString(value))
+        case reflect.Int:
+          field.SetInt(parseInt(value))
+        case reflect.Float32, reflect.Float64:
+          field.SetFloat(parseFloat(value))
+        case reflect.Bool:
+          field.SetBool(parseBool(value))
+        case reflect.Struct:
+          field.Set(parseStruct(value))
+        }
       } else {
-        err = errors.New(fmt.Sprintf("Sync failed to set field %s.", key))
+        err = errors.New(fmt.Sprintf("Failed to set field for column %s", column))
         return
+      }
+    }
+
+    for _, hook := range hooks {
+      if err = hook(object); nil != err {
+        return // Hook returned an error, return it to caller to deal with.
       }
     }
   }
@@ -254,6 +268,7 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
 
     element = replica.Elem()
 
+    // FIXME: Move this chunk of duplicated code into it's on helper method.
     for index, _ := range buffer {
       var (
         value  = (*buffer[index].(*interface{}))                                   // The dereferenced value at the current index.
@@ -262,7 +277,6 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
       )
 
       if field.CanSet() {
-        // FIXME: Look into just calling Set with ValueOf value.
         switch field.Kind() {
         case reflect.String:
           field.SetString(parseString(value))
