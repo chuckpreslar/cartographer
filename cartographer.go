@@ -264,6 +264,10 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
 }
 
 func setFieldValue(field reflect.Value, value interface{}) (err error) {
+  if nil == value {
+    return
+  }
+
   if field.CanSet() {
     switch field.Kind() {
     case reflect.String:
