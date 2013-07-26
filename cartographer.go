@@ -180,34 +180,25 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
     return
   }
 
-  numberOfColumns := len(columns)
-
   for rows.Next() {
-    buffer := generateBuffer(numberOfColumns)
-    err = rows.Scan(buffer...)
+    values, err := populatedRowValues(rows, len(columns))
 
     if nil != err {
-      return
+      return err
     }
 
-    // FIXME: Move this chunk of duplicated code into it's on helper method.
-    for index, _ := range buffer {
-      var (
-        value  = (*buffer[index].(*interface{}))                        // The dereferenced value at the current index.
-        column = columns[index]                                         // Current column.
-        field  = element.FieldByName(self.columnsToFields[typ][column]) // The field the value belongs to.
-      )
-
-      err = setFieldValue(field, value)
+    for index, _ := range values {
+      field := element.FieldByName(self.columnsToFields[typ][columns[index]]) // The field the value belongs to.
+      err = setFieldValue(field, (*values[index].(*interface{})))
 
       if nil != err {
-        return
+        return err
       }
     }
 
     for _, hook := range hooks {
       if err = hook(object); nil != err {
-        return // Hook returned an error, return it to caller to deal with.
+        return err // Hook returned an error, return it to caller to deal with.
       }
     }
   }
@@ -311,6 +302,12 @@ func setFieldValue(field reflect.Value, value interface{}) (err error) {
     err = errors.New("Failed to set field")
   }
 
+  return
+}
+
+func populatedRowValues(rows ScannableRows, size int) (values []interface{}, err error) {
+  values = generateBuffer(size)
+  err = rows.Scan(values...)
   return
 }
 
