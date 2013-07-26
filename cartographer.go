@@ -65,7 +65,7 @@ func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err err
 
 // CreateReplica uses the reflect package to create a replica of the interface passed,
 // returning a reflect.Value, or an error if `o` is not a struct.
-func (self *Cartographer) CreateReplica(o interface{}) (replica reflect.Value, err error) {
+func (self *Cartographer) CreateReplica(o interface{}, hooks ...Hook) (replica reflect.Value, err error) {
   typ, err := self.DiscoverType(o)
 
   if nil != err {
@@ -73,6 +73,13 @@ func (self *Cartographer) CreateReplica(o interface{}) (replica reflect.Value, e
   }
 
   replica = reflect.New(typ)
+
+  for _, hook := range hooks {
+    if err = hook(replica); nil != err {
+      return // Hook returned an error, return it to caller to deal with.
+    }
+  }
+
   return
 }
 
@@ -239,7 +246,7 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
       return
     }
 
-    replica, err = self.CreateReplica(o)
+    replica, err = self.CreateReplica(o, hooks...)
 
     if nil != err {
       return
@@ -268,12 +275,6 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
         case reflect.Struct:
           field.Set(parseStruct(value))
         }
-      }
-    }
-
-    for _, hook := range hooks {
-      if err = hook(replica); nil != err {
-        return // Hook returned an error, return it to caller to deal with.
       }
     }
 
