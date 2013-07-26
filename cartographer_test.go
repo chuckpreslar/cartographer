@@ -5,7 +5,7 @@ import (
   "testing"
 )
 
-var instance = New("db")
+var instance = Initialize("db")
 
 type scanner struct {
   scanned bool
