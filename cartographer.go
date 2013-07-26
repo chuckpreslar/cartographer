@@ -198,21 +198,9 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
         field  = element.FieldByName(self.columnsToFields[typ][column]) // The field the value belongs to.
       )
 
-      if field.CanSet() {
-        switch field.Kind() {
-        case reflect.String:
-          field.SetString(parseString(value))
-        case reflect.Int:
-          field.SetInt(parseInt(value))
-        case reflect.Float32, reflect.Float64:
-          field.SetFloat(parseFloat(value))
-        case reflect.Bool:
-          field.SetBool(parseBool(value))
-        case reflect.Struct:
-          field.Set(parseStruct(value))
-        }
-      } else {
-        err = errors.New(fmt.Sprintf("Failed to set field for column %s", column))
+      err = setFieldValue(field, value)
+
+      if nil != err {
         return
       }
     }
@@ -300,6 +288,27 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
 
     // Finally, append the replica of the passed item.
     results = append(results, replica.Interface())
+  }
+
+  return
+}
+
+func setFieldValue(field reflect.Value, value interface{}) (err error) {
+  if field.CanSet() {
+    switch field.Kind() {
+    case reflect.String:
+      field.SetString(parseString(value))
+    case reflect.Int:
+      field.SetInt(parseInt(value))
+    case reflect.Float32, reflect.Float64:
+      field.SetFloat(parseFloat(value))
+    case reflect.Bool:
+      field.SetBool(parseBool(value))
+    case reflect.Struct:
+      field.Set(parseStruct(value))
+    }
+  } else {
+    err = errors.New("Failed to set field")
   }
 
   return
