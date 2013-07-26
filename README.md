@@ -1,6 +1,6 @@
 # cartographer
 
-Provides mapping from SQL Query Rows to structs in Go.  Still under heavy development, should only be referred to as an example at the moment.
+Provides mapping from SQL query rows to structs in Go.
 
 [![Build Status](https://drone.io/github.com/chuckpreslar/cartographer/status.png)](https://drone.io/github.com/chuckpreslar/cartographer/latest)
 
@@ -36,7 +36,7 @@ func main() {
     // Handle potential error.
   }
 
-  instance := cartographer.New()
+  instance := cartographer.Initialize("db")
   
   users, err := instance.Map(rows, User{})
   
