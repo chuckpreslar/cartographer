@@ -131,7 +131,7 @@ func (self *Cartographer) FieldForColumn(o interface{}, column string) (string, 
     return field, nil
   }
 
-  return "", nil
+  return "", errors.New(fmt.Sprintf("No field for column %s on %v", column, typ))
 }
 
 // ColumnForField returns the column string associated with paramater `o` at field `field`
@@ -150,7 +150,7 @@ func (self *Cartographer) ColumnForField(o interface{}, field string) (string, e
     return column, nil
   }
 
-  return "", nil
+  return "", errors.New(fmt.Sprintf("No column for field %s on %v", field, typ))
 }
 
 // FieldValueMapFor returns a map of parameter `o`'s fields to their values, or an
