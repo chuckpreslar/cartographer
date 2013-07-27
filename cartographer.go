@@ -115,6 +115,44 @@ func (self *Cartographer) FieldsFor(o interface{}) (fields []string, err error) 
   return
 }
 
+// FieldForColumn returns the field string associated with paramater `o` at column `column`
+// or an error.
+func (self *Cartographer) FieldForColumn(o interface{}, column string) (string, error) {
+  typ, err := self.DiscoverType(o)
+
+  if nil != err {
+    return "", err
+  }
+
+  if field, ok := self.columnsToFields[typ][column]; ok {
+    return field, nil
+  } else if _, ok := self.fieldsToColumns[typ][column]; ok {
+    field = column
+    return field, nil
+  }
+
+  return "", nil
+}
+
+// ColumnForField returns the column string associated with paramater `o` at field `field`
+// or an error.
+func (self *Cartographer) ColumnForField(o interface{}, field string) (string, error) {
+  typ, err := self.DiscoverType(o)
+
+  if nil != err {
+    return "", err
+  }
+
+  if column, ok := self.fieldsToColumns[typ][field]; ok {
+    return column, nil
+  } else if _, ok := self.columnsToFields[typ][field]; ok {
+    column = field
+    return column, nil
+  }
+
+  return "", nil
+}
+
 // FieldValueMapFor returns a map of parameter `o`'s fields to their values, or an
 // error if `o` is not a struct.
 func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]interface{}, err error) {

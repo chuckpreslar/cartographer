@@ -84,3 +84,31 @@ func TestFieldValueMapFor(t *testing.T) {
     t.Errorf("Basic FieldValueMapFor test returned unexpected map: %v", values)
   }
 }
+
+func TestFieldForColumn(t *testing.T) {
+  field, err := instance.FieldForColumn(faker{}, "id")
+
+  if nil != err || field != "Id" {
+    t.Errorf("Basic FieldForColumn test returned an unexpected results: %v, %v", field, err)
+  }
+
+  field, err = instance.FieldForColumn(faker{}, "Id")
+
+  if nil != err || field != "Id" {
+    t.Errorf("Basic FieldForColumn test returned an unexpected results: %v, %v", field, err)
+  }
+}
+
+func TestColumnForField(t *testing.T) {
+  column, err := instance.FieldForColumn(faker{}, "id")
+
+  if nil != err || column != "Id" {
+    t.Errorf("Basic FieldForColumn test returned an unexpected results: %v, %v", column, err)
+  }
+
+  column, err = instance.FieldForColumn(faker{}, "Id")
+
+  if nil != err || column != "Id" {
+    t.Errorf("Basic FieldForColumn test returned an unexpected results: %v, %v", column, err)
+  }
+}
