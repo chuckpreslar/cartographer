@@ -33,7 +33,7 @@ func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err err
   }
 
   if reflect.Struct != typ.Kind() {
-    err = errors.New(fmt.Sprintf("cartographer > Expected a struct "+
+    err = errors.New(fmt.Sprintf("Expected a struct "+
       " to be passed, received %T.", o))
     return
   }
@@ -69,7 +69,6 @@ func (self *Cartographer) CreateReplica(o interface{}, hooks ...Hook) (replica r
   typ, err := self.DiscoverType(o)
 
   if nil != err {
-    err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
     return
   }
 
@@ -77,7 +76,6 @@ func (self *Cartographer) CreateReplica(o interface{}, hooks ...Hook) (replica r
 
   for _, hook := range hooks {
     if err = hook(replica); nil != err {
-      err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
       return // Hook returned an error, return it to caller to deal with.
     }
   }
@@ -91,7 +89,6 @@ func (self *Cartographer) ColumnsFor(o interface{}) (columns []string, err error
   typ, err := self.DiscoverType(o)
 
   if nil != err {
-    err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
     return
   }
 
@@ -108,7 +105,6 @@ func (self *Cartographer) FieldsFor(o interface{}) (fields []string, err error) 
   typ, err := self.DiscoverType(o)
 
   if nil != err {
-    err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
     return
   }
 
@@ -135,7 +131,7 @@ func (self *Cartographer) FieldForColumn(o interface{}, column string) (string, 
     return field, nil
   }
 
-  return "", errors.New(fmt.Sprintf("cartographer > No field for column %s on %v", column, typ))
+  return "", errors.New(fmt.Sprintf("No field for column %s on %v", column, typ))
 }
 
 // ColumnForField returns the column string associated with paramater `o` at field `field`
@@ -154,7 +150,7 @@ func (self *Cartographer) ColumnForField(o interface{}, field string) (string, e
     return column, nil
   }
 
-  return "", errors.New(fmt.Sprintf("cartographer > No column for field %s on %v", field, typ))
+  return "", errors.New(fmt.Sprintf("No column for field %s on %v", field, typ))
 }
 
 // FieldValueMapFor returns a map of parameter `o`'s fields to their values, or an
@@ -163,7 +159,6 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]int
   typ, err := self.DiscoverType(o)
 
   if nil != err {
-    err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
     return
   }
 
@@ -191,7 +186,6 @@ func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, 
   n, _ := self.FieldValueMapFor(o)
 
   if nil != err {
-    err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
     return
   }
 
@@ -220,7 +214,7 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
   object := reflect.ValueOf(o)
 
   if reflect.Ptr != object.Kind() {
-    err = errors.New("cartographer > Sync expected a pointer to be passed for manipulation")
+    err = errors.New("Sync expected a pointer to be passed for manipulation")
     return
   }
 
@@ -228,7 +222,6 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
   columns, err := rows.Columns()
 
   if nil != err {
-    err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
     return
   }
 
@@ -237,7 +230,6 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
     values, err := populatedRowValues(rows, len(columns))
 
     if nil != err {
-      err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
       return err
     }
 
@@ -247,13 +239,12 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
       err = setFieldValue(field, (*values[index].(*interface{})))
 
       if nil != err {
-        return errors.New(fmt.Sprintf("cartographer > %s for %s", err.Error(), columns[index]))
+        return errors.New(fmt.Sprintf("%s for %s", err.Error(), columns[index]))
       }
     }
 
     for _, hook := range hooks {
       if err = hook(object); nil != err {
-        err = errors.New(fmt.Sprintf("cartographer > %s", err.Error()))
         return err // Hook returned an error, return it to caller to deal with.
       }
     }
@@ -301,7 +292,7 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
       err = setFieldValue(field, (*values[index].(*interface{})))
 
       if nil != err {
-        return results, errors.New(fmt.Sprintf("cartographer > %s for column %s", err.Error(), columns[index]))
+        return results, errors.New(fmt.Sprintf("%s for column %s", err.Error(), columns[index]))
       }
     }
 
