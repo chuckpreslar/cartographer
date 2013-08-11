@@ -16,10 +16,10 @@ type ScannableRows interface {
 type Hook func(reflect.Value) error
 
 type Cartographer struct {
-  fieldsToColumns map[reflect.Type]map[string]string // Map from an reflect.Type's fields to database columns.
-  columnsToFields map[reflect.Type]map[string]string // Map from an reflect.Type's database columns to fields.
-  typeCache       map[reflect.Type]bool              // Is the reflect.Type cached?
-  structTag       string                             // Struct field tag for field to column mapping.
+  fieldsToColumns map[reflect.Type]map[interface{}]interface{} // Map from an reflect.Type's fields to database columns.
+  columnsToFields map[reflect.Type]map[interface{}]interface{} // Map from an reflect.Type's database columns to fields.
+  typeCache       map[reflect.Type]bool                        // Is the reflect.Type cached?
+  structTag       string                                       // Struct field tag for field to column mapping.
 }
 
 // DiscoverType the reflect.Type of the `o` parameter passed, caching
@@ -39,8 +39,8 @@ func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err err
   }
 
   if _, cached := self.typeCache[typ]; !cached {
-    self.fieldsToColumns[typ] = make(map[string]string)
-    self.columnsToFields[typ] = make(map[string]string)
+    self.fieldsToColumns[typ] = make(map[interface{}]interface{})
+    self.columnsToFields[typ] = make(map[interface{}]interface{})
     self.typeCache[typ] = true
 
     var numberOfFields = typ.NumField()
@@ -85,7 +85,7 @@ func (self *Cartographer) CreateReplica(o interface{}, hooks ...Hook) (replica r
 
 // ColumnsFor returns an array of strings of the types columns, or an
 // error if `o` is not a struct.
-func (self *Cartographer) ColumnsFor(o interface{}) (columns []string, err error) {
+func (self *Cartographer) ColumnsFor(o interface{}) (columns []interface{}, err error) {
   typ, err := self.DiscoverType(o)
 
   if nil != err {
@@ -101,7 +101,7 @@ func (self *Cartographer) ColumnsFor(o interface{}) (columns []string, err error
 
 // FieldsFor returns an array of strings of the types fields, or an
 // error if `o` is not a struct.
-func (self *Cartographer) FieldsFor(o interface{}) (fields []string, err error) {
+func (self *Cartographer) FieldsFor(o interface{}) (fields []interface{}, err error) {
   typ, err := self.DiscoverType(o)
 
   if nil != err {
@@ -115,9 +115,9 @@ func (self *Cartographer) FieldsFor(o interface{}) (fields []string, err error) 
   return
 }
 
-// FieldForColumn returns the field string associated with paramater `o` at column `column`
+// FieldForColumn returns the field interface associated with paramater `o` at column `column`
 // or an error.
-func (self *Cartographer) FieldForColumn(o interface{}, column string) (string, error) {
+func (self *Cartographer) FieldForColumn(o interface{}, column interface{}) (interface{}, error) {
   typ, err := self.DiscoverType(o)
 
   if nil != err {
@@ -134,9 +134,9 @@ func (self *Cartographer) FieldForColumn(o interface{}, column string) (string, 
   return "", errors.New(fmt.Sprintf("No field for column %s on %v", column, typ))
 }
 
-// ColumnForField returns the column string associated with paramater `o` at field `field`
+// ColumnForField returns the column interface associated with paramater `o` at field `field`
 // or an error.
-func (self *Cartographer) ColumnForField(o interface{}, field string) (string, error) {
+func (self *Cartographer) ColumnForField(o interface{}, field interface{}) (interface{}, error) {
   typ, err := self.DiscoverType(o)
 
   if nil != err {
@@ -155,14 +155,14 @@ func (self *Cartographer) ColumnForField(o interface{}, field string) (string, e
 
 // FieldValueMapFor returns a map of parameter `o`'s fields to their values, or an
 // error if `o` is not a struct.
-func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]interface{}, err error) {
+func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[interface{}]interface{}, err error) {
   typ, err := self.DiscoverType(o)
 
   if nil != err {
     return
   }
 
-  values = make(map[string]interface{})
+  values = make(map[interface{}]interface{})
 
   item := reflect.ValueOf(o)
 
@@ -171,7 +171,7 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]int
   }
 
   for key, _ := range self.fieldsToColumns[typ] {
-    values[key] = item.FieldByName(key).Interface()
+    values[key] = item.FieldByName(key.(string)).Interface()
   }
 
   return
@@ -181,7 +181,7 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[string]int
 // intedned to be a snap shot of the object `o` at an early time/previous state,
 // returning a map of the column name for the modified field to its value,
 // or an error if one occurs.
-func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, o interface{}) (values map[string]interface{}, err error) {
+func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[interface{}]interface{}, o interface{}) (values map[interface{}]interface{}, err error) {
   typ, err := self.DiscoverType(o)
   n, _ := self.FieldValueMapFor(o)
 
@@ -189,7 +189,7 @@ func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[string]interface{}, 
     return
   }
 
-  values = make(map[string]interface{})
+  values = make(map[interface{}]interface{})
 
   for key, value := range n {
     if n[key] != i[key] {
@@ -235,7 +235,7 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
 
     for index, _ := range values {
       name := self.columnsToFields[typ][columns[index]] // The name of the field.
-      field := element.FieldByName(name)                // The field the value belongs to.
+      field := element.FieldByName(name.(string))       // The field the value belongs to.
       err = setFieldValue(field, (*values[index].(*interface{})))
 
       if nil != err {
@@ -288,7 +288,7 @@ func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) 
 
     for index, _ := range values {
       name := self.columnsToFields[element.Type()][columns[index]]
-      field := element.FieldByName(name) // The field the value belongs to.
+      field := element.FieldByName(name.(string)) // The field the value belongs to.
       err = setFieldValue(field, (*values[index].(*interface{})))
 
       if nil != err {
@@ -388,8 +388,8 @@ func parseStruct(o interface{}) reflect.Value {
 // columns to the one passed as parameter `structTag`.
 func Initialize(structTag string) (cartographer *Cartographer) {
   cartographer = new(Cartographer)
-  cartographer.fieldsToColumns = make(map[reflect.Type]map[string]string)
-  cartographer.columnsToFields = make(map[reflect.Type]map[string]string)
+  cartographer.fieldsToColumns = make(map[reflect.Type]map[interface{}]interface{})
+  cartographer.columnsToFields = make(map[reflect.Type]map[interface{}]interface{})
   cartographer.typeCache = make(map[reflect.Type]bool)
   cartographer.structTag = structTag
 
