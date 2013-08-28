@@ -1,6 +1,6 @@
 # cartographer
 
-Provides mapping from SQL query rows to structs in Go.
+Provides mapping to syncing of results from SQL query rows to structs in Go.
 
 [![Build Status](https://drone.io/github.com/chuckpreslar/cartographer/status.png)](https://drone.io/github.com/chuckpreslar/cartographer/latest)
 
