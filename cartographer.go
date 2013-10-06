@@ -1,180 +1,180 @@
 package cartographer
 
 import (
-  "errors"
-  "fmt"
-  "reflect"
-  "strconv"
+	"errors"
+	"fmt"
+	"reflect"
+	"strconv"
 )
 
 type ScannableRows interface {
-  Next() bool
-  Columns() ([]string, error)
-  Scan(...interface{}) error
+	Next() bool
+	Columns() ([]string, error)
+	Scan(...interface{}) error
 }
 
 type Hook func(reflect.Value) error
 
 type Cartographer struct {
-  fieldsToColumns map[reflect.Type]map[interface{}]interface{} // Map from an reflect.Type's fields to database columns.
-  columnsToFields map[reflect.Type]map[interface{}]interface{} // Map from an reflect.Type's database columns to fields.
-  typeCache       map[reflect.Type]bool                        // Is the reflect.Type cached?
-  structTag       string                                       // Struct field tag for field to column mapping.
+	fieldsToColumns map[reflect.Type]map[interface{}]interface{} // Map from an reflect.Type's fields to database columns.
+	columnsToFields map[reflect.Type]map[interface{}]interface{} // Map from an reflect.Type's database columns to fields.
+	typeCache       map[reflect.Type]bool                        // Is the reflect.Type cached?
+	structTag       string                                       // Struct field tag for field to column mapping.
 }
 
 // DiscoverType the reflect.Type of the `o` parameter passed, caching
 // its fields and database columns taken from the fields `db` tag, or an
 // error if the reflect.Type's kind is not a struct.
 func (self *Cartographer) DiscoverType(o interface{}) (typ reflect.Type, err error) {
-  typ = reflect.TypeOf(o)
+	typ = reflect.TypeOf(o)
 
-  if reflect.Ptr == typ.Kind() {
-    typ = typ.Elem()
-  }
+	if reflect.Ptr == typ.Kind() {
+		typ = typ.Elem()
+	}
 
-  if reflect.Struct != typ.Kind() {
-    err = errors.New(fmt.Sprintf("Expected a struct "+
-      " to be passed, received %T.", o))
-    return
-  }
+	if reflect.Struct != typ.Kind() {
+		err = errors.New(fmt.Sprintf("Expected a struct "+
+			" to be passed, received %T.", o))
+		return
+	}
 
-  if _, cached := self.typeCache[typ]; !cached {
-    self.fieldsToColumns[typ] = make(map[interface{}]interface{})
-    self.columnsToFields[typ] = make(map[interface{}]interface{})
-    self.typeCache[typ] = true
+	if _, cached := self.typeCache[typ]; !cached {
+		self.fieldsToColumns[typ] = make(map[interface{}]interface{})
+		self.columnsToFields[typ] = make(map[interface{}]interface{})
+		self.typeCache[typ] = true
 
-    var numberOfFields = typ.NumField()
+		var numberOfFields = typ.NumField()
 
-    for i := 0; i < numberOfFields; i++ {
-      var (
-        field  = typ.Field(i)
-        name   = field.Name
-        column = field.Tag.Get(self.structTag)
-      )
+		for i := 0; i < numberOfFields; i++ {
+			var (
+				field  = typ.Field(i)
+				name   = field.Name
+				column = field.Tag.Get(self.structTag)
+			)
 
-      if 0 != len(column) {
-        self.columnsToFields[typ][column] = name
-        self.fieldsToColumns[typ][name] = column
-      }
+			if 0 != len(column) {
+				self.columnsToFields[typ][column] = name
+				self.fieldsToColumns[typ][name] = column
+			}
 
-    }
-  }
+		}
+	}
 
-  return
+	return
 }
 
 // CreateReplica uses the reflect package to create a replica of the interface passed,
 // returning a reflect.Value, or an error if `o` is not a struct.
 func (self *Cartographer) CreateReplica(o interface{}, hooks ...Hook) (replica reflect.Value, err error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  replica = reflect.New(typ)
+	replica = reflect.New(typ)
 
-  for _, hook := range hooks {
-    if err = hook(replica); nil != err {
-      return // Hook returned an error, return it to caller to deal with.
-    }
-  }
+	for _, hook := range hooks {
+		if err = hook(replica); nil != err {
+			return // Hook returned an error, return it to caller to deal with.
+		}
+	}
 
-  return
+	return
 }
 
 // ColumnsFor returns an array of strings of the types columns, or an
 // error if `o` is not a struct.
 func (self *Cartographer) ColumnsFor(o interface{}) (columns []interface{}, err error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  for key, _ := range self.columnsToFields[typ] {
-    columns = append(columns, key)
-  }
+	for key, _ := range self.columnsToFields[typ] {
+		columns = append(columns, key)
+	}
 
-  return
+	return
 }
 
 // FieldsFor returns an array of strings of the types fields, or an
 // error if `o` is not a struct.
 func (self *Cartographer) FieldsFor(o interface{}) (fields []interface{}, err error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  for key, _ := range self.fieldsToColumns[typ] {
-    fields = append(fields, key)
-  }
+	for key, _ := range self.fieldsToColumns[typ] {
+		fields = append(fields, key)
+	}
 
-  return
+	return
 }
 
 // FieldForColumn returns the field interface associated with paramater `o` at column `column`
 // or an error.
 func (self *Cartographer) FieldForColumn(o interface{}, column interface{}) (interface{}, error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return "", err
-  }
+	if nil != err {
+		return "", err
+	}
 
-  if field, ok := self.columnsToFields[typ][column]; ok {
-    return field, nil
-  } else if _, ok := self.fieldsToColumns[typ][column]; ok {
-    field = column
-    return field, nil
-  }
+	if field, ok := self.columnsToFields[typ][column]; ok {
+		return field, nil
+	} else if _, ok := self.fieldsToColumns[typ][column]; ok {
+		field = column
+		return field, nil
+	}
 
-  return "", errors.New(fmt.Sprintf("No field for column %s on %v", column, typ))
+	return "", errors.New(fmt.Sprintf("No field for column %s on %v", column, typ))
 }
 
 // ColumnForField returns the column interface associated with paramater `o` at field `field`
 // or an error.
 func (self *Cartographer) ColumnForField(o interface{}, field interface{}) (interface{}, error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return "", err
-  }
+	if nil != err {
+		return "", err
+	}
 
-  if column, ok := self.fieldsToColumns[typ][field]; ok {
-    return column, nil
-  } else if _, ok := self.columnsToFields[typ][field]; ok {
-    column = field
-    return column, nil
-  }
+	if column, ok := self.fieldsToColumns[typ][field]; ok {
+		return column, nil
+	} else if _, ok := self.columnsToFields[typ][field]; ok {
+		column = field
+		return column, nil
+	}
 
-  return "", errors.New(fmt.Sprintf("No column for field %s on %v", field, typ))
+	return "", errors.New(fmt.Sprintf("No column for field %s on %v", field, typ))
 }
 
 // FieldValueMapFor returns a map of parameter `o`'s fields to their values, or an
 // error if `o` is not a struct.
 func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[interface{}]interface{}, err error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  values = make(map[interface{}]interface{})
+	values = make(map[interface{}]interface{})
 
-  item := reflect.ValueOf(o)
+	item := reflect.ValueOf(o)
 
-  if reflect.Ptr == item.Kind() {
-    item = item.Elem()
-  }
+	if reflect.Ptr == item.Kind() {
+		item = item.Elem()
+	}
 
-  for key, _ := range self.fieldsToColumns[typ] {
-    values[key] = item.FieldByName(key.(string)).Interface()
-  }
+	for key, _ := range self.fieldsToColumns[typ] {
+		values[key] = item.FieldByName(key.(string)).Interface()
+	}
 
-  return
+	return
 }
 
 // ModifiedColumnsValuesMapFor accepts a map of strings to interfaces
@@ -182,22 +182,22 @@ func (self *Cartographer) FieldValueMapFor(o interface{}) (values map[interface{
 // returning a map of the column name for the modified field to its value,
 // or an error if one occurs.
 func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[interface{}]interface{}, o interface{}) (values map[interface{}]interface{}, err error) {
-  typ, err := self.DiscoverType(o)
-  n, _ := self.FieldValueMapFor(o)
+	typ, err := self.DiscoverType(o)
+	n, _ := self.FieldValueMapFor(o)
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  values = make(map[interface{}]interface{})
+	values = make(map[interface{}]interface{})
 
-  for key, value := range n {
-    if n[key] != i[key] {
-      values[self.fieldsToColumns[typ][key]] = value
-    }
-  }
+	for key, value := range n {
+		if n[key] != i[key] {
+			values[self.fieldsToColumns[typ][key]] = value
+		}
+	}
 
-  return
+	return
 }
 
 // Sync is a helper method that is inteded to be used typically after
@@ -205,52 +205,52 @@ func (self *Cartographer) ModifiedColumnsValuesMapFor(i map[interface{}]interfac
 // that's potentially auto incremented returned, returning the synced
 // objected or an error.
 func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook) (err error) {
-  typ, err := self.DiscoverType(o)
+	typ, err := self.DiscoverType(o)
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  object := reflect.ValueOf(o)
+	object := reflect.ValueOf(o)
 
-  if reflect.Ptr != object.Kind() {
-    err = errors.New("Sync expected a pointer to be passed for manipulation")
-    return
-  }
+	if reflect.Ptr != object.Kind() {
+		err = errors.New("Sync expected a pointer to be passed for manipulation")
+		return
+	}
 
-  element := object.Elem()
-  columns, err := rows.Columns()
+	element := object.Elem()
+	columns, err := rows.Columns()
 
-  if nil != err {
-    return
-  }
+	if nil != err {
+		return
+	}
 
-  // FIXME: The logic within this loop is similar enough with Maps's to be refactored into a method.
-  for rows.Next() {
-    values, err := populatedRowValues(rows, len(columns))
+	// FIXME: The logic within this loop is similar enough with Maps's to be refactored into a method.
+	for rows.Next() {
+		values, err := populatedRowValues(rows, len(columns))
 
-    if nil != err {
-      return err
-    }
+		if nil != err {
+			return err
+		}
 
-    for index, _ := range values {
-      name := self.columnsToFields[typ][columns[index]] // The name of the field.
-      field := element.FieldByName(name.(string))       // The field the value belongs to.
-      err = setFieldValue(field, (*values[index].(*interface{})))
+		for index, _ := range values {
+			name := self.columnsToFields[typ][columns[index]] // The name of the field.
+			field := element.FieldByName(name.(string))       // The field the value belongs to.
+			err = setFieldValue(field, (*values[index].(*interface{})))
 
-      if nil != err {
-        return errors.New(fmt.Sprintf("%s for %s", err.Error(), columns[index]))
-      }
-    }
+			if nil != err {
+				return errors.New(fmt.Sprintf("%s for %s", err.Error(), columns[index]))
+			}
+		}
 
-    for _, hook := range hooks {
-      if err = hook(object); nil != err {
-        return err // Hook returned an error, return it to caller to deal with.
-      }
-    }
-  }
+		for _, hook := range hooks {
+			if err = hook(object); nil != err {
+				return err // Hook returned an error, return it to caller to deal with.
+			}
+		}
+	}
 
-  return
+	return
 }
 
 // Map takes any type that implements the ScannableRows interface,
@@ -264,134 +264,134 @@ func (self *Cartographer) Sync(rows ScannableRows, o interface{}, hooks ...Hook)
 // passed to map are given a replica generated by reflect.New of
 // the `o` parameter, a list of it's fields, and their initial values.
 func (self *Cartographer) Map(rows ScannableRows, o interface{}, hooks ...Hook) (results []interface{}, err error) {
-  columns, err := rows.Columns() // Columns returned for the results returned.
+	columns, err := rows.Columns() // Columns returned for the results returned.
 
-  if nil != err {
-    return results, err
-  }
+	if nil != err {
+		return results, err
+	}
 
-  // FIXME: The logic within this loop is similar enough with Sync's to be refactored into a method.
-  for rows.Next() {
-    values, err := populatedRowValues(rows, len(columns))
+	// FIXME: The logic within this loop is similar enough with Sync's to be refactored into a method.
+	for rows.Next() {
+		values, err := populatedRowValues(rows, len(columns))
 
-    if nil != err {
-      return results, err
-    }
+		if nil != err {
+			return results, err
+		}
 
-    replica, err := self.CreateReplica(o, hooks...)
+		replica, err := self.CreateReplica(o, hooks...)
 
-    if nil != err {
-      return results, err
-    }
+		if nil != err {
+			return results, err
+		}
 
-    element := replica.Elem()
+		element := replica.Elem()
 
-    for index, _ := range values {
-      name := self.columnsToFields[element.Type()][columns[index]]
-      field := element.FieldByName(name.(string)) // The field the value belongs to.
-      err = setFieldValue(field, (*values[index].(*interface{})))
+		for index, _ := range values {
+			name := self.columnsToFields[element.Type()][columns[index]]
+			field := element.FieldByName(name.(string)) // The field the value belongs to.
+			err = setFieldValue(field, (*values[index].(*interface{})))
 
-      if nil != err {
-        return results, errors.New(fmt.Sprintf("%s for column %s", err.Error(), columns[index]))
-      }
-    }
+			if nil != err {
+				return results, errors.New(fmt.Sprintf("%s for column %s", err.Error(), columns[index]))
+			}
+		}
 
-    // Finally, append the replica of the passed item.
-    results = append(results, replica.Interface())
-  }
+		// Finally, append the replica of the passed item.
+		results = append(results, replica.Interface())
+	}
 
-  return
+	return
 }
 
 func setFieldValue(field reflect.Value, value interface{}) (err error) {
-  if nil == value {
-    return
-  }
+	if nil == value {
+		return
+	}
 
-  if field.CanSet() {
-    switch field.Kind() {
-    case reflect.String:
-      field.SetString(parseString(value))
-    case reflect.Int:
-      field.SetInt(parseInt(value))
-    case reflect.Float32, reflect.Float64:
-      field.SetFloat(parseFloat(value))
-    case reflect.Bool:
-      field.SetBool(parseBool(value))
-    case reflect.Struct:
-      field.Set(parseStruct(value))
-    }
-  } else {
-    err = errors.New("Failed to set field")
-  }
+	if field.CanSet() {
+		switch field.Kind() {
+		case reflect.String:
+			field.SetString(parseString(value))
+		case reflect.Int:
+			field.SetInt(parseInt(value))
+		case reflect.Float32, reflect.Float64:
+			field.SetFloat(parseFloat(value))
+		case reflect.Bool:
+			field.SetBool(parseBool(value))
+		case reflect.Struct:
+			field.Set(parseStruct(value))
+		}
+	} else {
+		err = errors.New("Failed to set field")
+	}
 
-  return
+	return
 }
 
 func populatedRowValues(rows ScannableRows, size int) (values []interface{}, err error) {
-  values = generateBuffer(size)
-  err = rows.Scan(values...)
-  return
+	values = generateBuffer(size)
+	err = rows.Scan(values...)
+	return
 }
 
 func generateBuffer(length int) (buffer []interface{}) {
-  buffer = make([]interface{}, length)
+	buffer = make([]interface{}, length)
 
-  for index, _ := range buffer {
-    var item interface{}
-    buffer[index] = &item
-  }
+	for index, _ := range buffer {
+		var item interface{}
+		buffer[index] = &item
+	}
 
-  return
+	return
 }
 
 func parseString(o interface{}) string {
-  return fmt.Sprintf("%s", o)
+	return fmt.Sprintf("%s", o)
 }
 
 func parseInt(o interface{}) int64 {
-  switch o.(type) {
-  case int:
-    return int64(o.(int))
-  case int16:
-    return int64(o.(int16))
-  case int32:
-    return int64(o.(int32))
-  default:
-    return int64(o.(int64))
-  }
+	switch o.(type) {
+	case int:
+		return int64(o.(int))
+	case int16:
+		return int64(o.(int16))
+	case int32:
+		return int64(o.(int32))
+	default:
+		return int64(o.(int64))
+	}
 }
 
 func parseFloat(o interface{}) float64 {
-  switch o.(type) {
-  case []uint8:
-    // FIXME: Should never error, but still bad pratice.
-    float, _ := strconv.ParseFloat(fmt.Sprintf("%s", o), 8)
-    return float
-  case float32:
-    return float64(o.(float32))
-  default:
-    return float64(o.(float64))
-  }
+	switch o.(type) {
+	case []uint8:
+		// FIXME: Should never error, but still bad pratice.
+		float, _ := strconv.ParseFloat(fmt.Sprintf("%s", o), 8)
+		return float
+	case float32:
+		return float64(o.(float32))
+	default:
+		return float64(o.(float64))
+	}
 }
 
 func parseBool(o interface{}) bool {
-  return o.(bool)
+	return o.(bool)
 }
 
 func parseStruct(o interface{}) reflect.Value {
-  return reflect.ValueOf(o)
+	return reflect.ValueOf(o)
 }
 
 // Initialize returns a pointer to a new Cartographer type, setting
 // its structTag field which it uses to map fields to database
 // columns to the one passed as parameter `structTag`.
 func Initialize(structTag string) (cartographer *Cartographer) {
-  cartographer = new(Cartographer)
-  cartographer.fieldsToColumns = make(map[reflect.Type]map[interface{}]interface{})
-  cartographer.columnsToFields = make(map[reflect.Type]map[interface{}]interface{})
-  cartographer.typeCache = make(map[reflect.Type]bool)
-  cartographer.structTag = structTag
+	cartographer = new(Cartographer)
+	cartographer.fieldsToColumns = make(map[reflect.Type]map[interface{}]interface{})
+	cartographer.columnsToFields = make(map[reflect.Type]map[interface{}]interface{})
+	cartographer.typeCache = make(map[reflect.Type]bool)
+	cartographer.structTag = structTag
 
-  return
+	return
 }
